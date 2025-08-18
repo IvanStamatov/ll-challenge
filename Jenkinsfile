@@ -6,29 +6,20 @@ pipeline {
 
     // Define parameters
     parameters {
-        string(name: 'repository_source')
-        string(name: 'repository_target')
+        string(name: 'repository_source', defaultValue: '', description: 'Source Git Repository URL')
+        string(name: 'repository_target', defaultValue: '', description: 'Target Git Repository URL')
     }
-    
+
     // Section for stages
     stages {
-        stage('Hello') {
+        stage('Validate Parameters') {
             steps {
-                sh '''
-                    if [ -z "$params.repository_source" ] || [ -z "$params.repository_target" ]; then
-                        echo "Error: Empty params"
-                        exit 1
-                    fi
-
-                    pwd
-                    ls -lah
-                    mkdir -p source_repo target_repo
-                
-                    git clone ${params.repository_source} source_repo
-                    git clone ${params.repository_target} target_repo
-
-                    ls -lah source_repo target_repo
-                '''
+                script {
+                    if (params.repository_source == '' || params.repository_target == '') {
+                        error "Repository parameters cannot be empty"
+                    }
+                }
+                echo "Parameters validated successfully"
             }
         }
     }
