@@ -15,11 +15,13 @@ pipeline {
         stage('Validate Parameters') {
             steps {
                 script {
-                    if (params.repository_source == '' || params.repository_target == '') {
-                        error "Repository parameters cannot be empty"
-                    }
+                    def repoValidation = sh(
+                        script: """
+                            ${WORKSPACE}/simple_python_file.py "${params.repository_source}" "${params.repository_target}"
+                        """,
+                        returnStatus: true
+                    )
                 }
-                echo "Parameters validated successfully"
             }
         }
     }
