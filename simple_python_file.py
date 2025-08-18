@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+# Called in Jenkins pipeline with:
+# steps {
+#     sh "python3 simple_python_file.py ${params.SOURCE} ${params.TARGET}"
+# }
+
 import sys # For working with arguments
 
 # Function to check a single URL, to be called for each one
