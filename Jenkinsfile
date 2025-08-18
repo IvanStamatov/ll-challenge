@@ -14,16 +14,7 @@ pipeline {
     stages {
         stage('Validate Parameters') {
             steps {
-                sh '''
-                    #!/bin/bash
-                    ls -lah 
-                    py_script_path=$(find . -name "simple_python_file.py" -type f)
-                    echo $py_script_path
-                    echo ${params.SOURCE}
-                    echo ${params.TARGET}
-                    
-                    python3 $py_script_path ${params.SOURCE} ${params.TARGET}
-                '''
+                sh "python3 simple_python_file.py ${params.SOURCE} ${params.TARGET}"
             }
         }
     }
