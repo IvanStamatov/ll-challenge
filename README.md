@@ -1,9 +1,9 @@
 # About
-- Repository for Jenkins pipelines as an exercise
+- Repository for Jenkins pipeline as an exercise
 
 # Repository content
 - Bash and Python scripts 
-- Pipeline yml files
+- Jenkinsfile
 - README.md
 - Diagram of project
 - User guide
@@ -32,10 +32,19 @@
 - Commit message to include "TXXX", where X would be the imaginary service ticket
 - Separate ticket per functionality/task
 
+| Ticket | Description |
+|--------|-------------|
+| T001   | For updating README and documentation |
+| T002   | For testing setup |
+| T003   | For adding base Python script and a valid Jenkinsfile |
+| T004   | For working on the Python comparison file |
+| T005   | For updating the Jenkins file to work with T004 Python script |
+
 # Sources
 | Resource | Links |
 |----------|-------|
-| DSL | • [Jenkins Job DSL Pipeline Steps](https://www.jenkins.io/doc/pipeline/steps/job-dsl/)<br>• [EPAM article on Jenkins DSL options](https://medium.com/epam-delivery-platform/jenkins-job-dsl-pipeline-dsl-declarative-pipeline-scripted-pipeline-groovy-libraries-aaaaab9250e6) |
-| Jenkins Images | • [Jenkins Download Page](https://www.jenkins.io/download/) |
-| Jenkins in Docker | • [Jenkins in Docker Installation Guide](https://www.jenkins.io/doc/book/installing/docker/) |
-| Jenkins Pipeline | • [Jenkins Pipelines Official Guide](https://www.jenkins.io/doc/book/pipeline/) |
+| DSL | [Jenkins Job DSL Pipeline Steps](https://www.jenkins.io/doc/pipeline/steps/job-dsl/)<br>[EPAM article on Jenkins DSL options](https://medium.com/epam-delivery-platform/jenkins-job-dsl-pipeline-dsl-declarative-pipeline-scripted-pipeline-groovy-libraries-aaaaab9250e6) |
+| Jenkins Images | [Jenkins Download Page](https://www.jenkins.io/download/) |
+| Jenkins in Docker | [Jenkins in Docker Installation Guide](https://www.jenkins.io/doc/book/installing/docker/) |
+| Jenkins Pipeline | [Jenkins Pipelines Official Guide](https://www.jenkins.io/doc/book/pipeline/) |
+| Compare dirs in Python | [fimecmp package](https://docs.python.org/3/library/filecmp.html) |
