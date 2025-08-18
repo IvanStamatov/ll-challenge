@@ -14,14 +14,12 @@ pipeline {
     stages {
         stage('Validate Parameters') {
             steps {
-                script {
-                    def repoValidation = sh(
-                        script: """
-                            ${WORKSPACE}/simple_python_file.py "${params.repository_source}" "${params.repository_target}"
-                        """,
-                        returnStatus: true
-                    )
-                }
+                sh '''
+                    ls -lah 
+                    py_script_path=$(find . -name "simple_python_file.py" -type f)
+                    echo $py_script_path
+                    python3 $py_script_path "${params.repository_source}" "${params.repository_target}"
+                '''
             }
         }
     }
