@@ -26,7 +26,8 @@
 - Jenkins: 
     - Hosted in a Docker container
     - Version: 2.516.1
-    
+- AWS CLI: 2.28.11
+
 # Operational
 - Commit message to include "TXXX", where X would be the imaginary service ticket
 - Separate ticket per functionality/task
@@ -37,3 +38,4 @@
 | DSL | • [Jenkins Job DSL Pipeline Steps](https://www.jenkins.io/doc/pipeline/steps/job-dsl/)<br>• [EPAM article on Jenkins DSL options](https://medium.com/epam-delivery-platform/jenkins-job-dsl-pipeline-dsl-declarative-pipeline-scripted-pipeline-groovy-libraries-aaaaab9250e6) |
 | Jenkins Images | • [Jenkins Download Page](https://www.jenkins.io/download/) |
 | Jenkins in Docker | • [Jenkins in Docker Installation Guide](https://www.jenkins.io/doc/book/installing/docker/) |
+| Jenkins Pipeline | • [Jenkins Pipelines Official Guide](https://www.jenkins.io/doc/book/pipeline/) |
