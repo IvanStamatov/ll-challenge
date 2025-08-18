@@ -8,8 +8,8 @@ pipeline {
     stages {
         stage('Hello') {
             steps {
-                echo "Hello, this is a message from instance: [$(hostname -i)]"
-                echo "Current user: [$(whoami)]"
+                sh 'echo "Hello, this is a message from instance: [$(hostname -i)]"'
+                sh 'echo "Current user: [$(whoami)]"'
             }
         }
     }
