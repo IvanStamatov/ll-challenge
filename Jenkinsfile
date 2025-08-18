@@ -9,7 +9,7 @@ pipeline {
         stage('Hello') {
             steps {
                 sh 'echo "Hello, this is a message from instance: [$(hostname -i)]"'
-                sh 'echo "Current user: [$(whoami)]"'
+                sh 'echo "Current user: [$(ls -lah)]"'
             }
         }
     }
