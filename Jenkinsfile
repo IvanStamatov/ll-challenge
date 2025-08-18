@@ -4,6 +4,12 @@ pipeline {
     // ADO equal: [pool]
     agent any
 
+    // Define parameters
+    parameters {
+        string(name: 'repository_source')
+        string(name: 'repository_target')
+    }
+    
     // Section for stages
     stages {
         stage('Hello') {
@@ -13,7 +19,7 @@ pipeline {
                         echo "Error: Empty params"
                         exit 1
                     fi
-                    
+
                     pwd
                     ls -lah
                     mkdir -p source_repo target_repo
