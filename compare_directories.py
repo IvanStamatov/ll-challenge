@@ -1,15 +1,14 @@
 # Task is to have a script that compares:
-# - directories and the files within them.
-# - compare commits and tags in Git repos
+# [X] Directories and the files within them - Completed
+# [ ] Compare commits and tags in Git repos - Completed only commits
+# [X] Output to be used by other scripts
+# [ ] Output as HTML report
+# [ ] Store the JSON file with the names of the repos
 # ===============
-# This means that we needs to validate:
-# 1) If the input is not empty 
-# 2) If the repo URL exists and is accessible(permission)
-# ? Check if it is a local dir or URL to remote repo
-# ===============
-# Output
-# There are no specific requirements for the output format, but it should be clear, structured and convenient for processing by another script or program.
-# First though is JSON - it can be used to make an HTML report for humans, while being perfect for scripts/pipelines
+# Validations:
+# [X] If the input is not empty 
+# [X] If the repo URL exists and is accessible(permission)
+# [X] Check if it is a local dir or URL to remote repo
 # ===============
 # Decisions:
 # - Input would be limited to only two directories
@@ -21,7 +20,7 @@ import filecmp # Needed to compare directories - Will try homemade approach as w
 import subprocess # To run commands with external packages/git/aws
 import json # For capturing the comparison results
 
-
+# Function to check if the input is for a remote repo or a local dir
 def is_remote_repository(repo_url):
     # Check if the input is empty
     if not repo_url:
@@ -36,7 +35,7 @@ def is_remote_repository(repo_url):
         print(f"[Info] Detected local directory: [{repo_url}]")
         return False
 
-
+# Split into two functions based on if the repo is remote or local
 def initiate_remote_directory(repo_url, path):
     try:
         response = requests.get(repo_url)
@@ -63,7 +62,7 @@ def initiate_remote_directory(repo_url, path):
     except subprocess.CalledProcessError:
         print(f"[Error] Failed to clone {repo_url}")
         return None
-
+    
 
 def initiate_local_directory(repo_url, path):
     # Check if the local directory exists
@@ -74,6 +73,7 @@ def initiate_local_directory(repo_url, path):
         print(f"[Success] Local directory: [{repo_url}] is valid")
         path = repo_url
         return path
+
 
 # Function to compare two directories
 def compare_directories(source_directory, target_directory, source_url, target_url):
@@ -198,7 +198,7 @@ def checkout_repo(path, branch, commit):
 
 def main():
     # Group variables by source and target - This blocks development for comparing more than 2 dirs
-    # Temporary section, input might be a list
+    # Temporary section - input to be provided by Jenkins Parameters
     # https://github.com/rust-lang/rustlings
     source_url = "https://github.com/inancgumus/learngo"
     source_branch = ""
@@ -206,9 +206,7 @@ def main():
 
     target_url = "https://github.com/inancgumus/learngo"
     target_branch = ""
-    target_commit = "c8d7a50e9e7f2b5e7b72ddb5c6091fcbf7953f93"
-    
-
+    target_commit = ""
 
     # Establish the repo/dir and return a path to be checked. If remote, the path is a custom folder, if local, the path is the input
     # Code for source
