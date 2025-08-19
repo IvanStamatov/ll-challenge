@@ -4,21 +4,30 @@ import filecmp # Needed to compare directories - Will try homemade approach as w
 import subprocess # To run commands with external packages/git/aws
 import json # For capturing the comparison results
 import argparse # For getting arguments from the Jenkins pipeline
+import sys # For exiting the script with an error code
+import logging # To replace print statements and provide proper logging
 
+# Setting up the logging messages
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Setting up raise options
+class ValidationError(Exception):
+    """Exception raised when input validation fails"""
+    pass
 
 # Function to check if the input is for a remote repo or a local dir
 def is_remote_repository(repo_url):
     # Check if the input is empty
     if not repo_url:
-        print("[Error] Provided value for repository is empty ")
-        return None
+        logging.info("[Error] Provided value for repository is empty ")
+        raise ValidationError("Provided value for repository is empty")
     
     # Check if the input is a local directory or a URL
     if repo_url.startswith("http://") or repo_url.startswith("https://"):
-        print(f"[Info] Detected remote repository URL: [{repo_url}]")
+        logging.info(f"[Info] Detected remote repository URL: [{repo_url}]")
         return True
     else:
-        print(f"[Info] Detected local directory: [{repo_url}]")
+        logging.info(f"[Info] Detected local directory: [{repo_url}]")
         return False
 
 
@@ -27,37 +36,37 @@ def initiate_remote_directory(repo_url, path):
     try:
         response = requests.get(repo_url)
         if response.status_code != 200:
-            print(f"[Error] Remote repository: [{repo_url}] is not accessible (HTTP {response.status_code})")
+            logging.info(f"[Error] Remote repository: [{repo_url}] is not accessible (HTTP {response.status_code})")
             return None
         else:
-            print(f"[Success] Remote repository: [{repo_url}] is accessible")
+            logging.info(f"[Success] Remote repository: [{repo_url}] is accessible")
     except requests.RequestException as e:
-        print(f"[Error] Invalid Repository URL: [{repo_url}]")
+        logging.info(f"[Error] Invalid Repository URL: [{repo_url}]")
         return None
 
-    print(f"[Info] Cloning the remote repo: [{repo_url}]")
+    logging.info(f"[Info] Cloning the remote repo: [{repo_url}]")
 
     # Remove the folder if it exists already - Could be a better way to ensure important files/paths do not get deleted (case: if path name matches another folder)
     if os.path.exists(path):
-        print(f"[Info] Removing existing directory: [{path}]")
+        logging.info(f"[Info] Removing existing directory: [{path}]")
         subprocess.run(["rm", "-rf", path], check=True)
     
     try:
         subprocess.run(["git", "clone", repo_url, path], check=True)
-        print(f"[Success] Cloned {repo_url} into {path}")
+        logging.info(f"[Success] Cloned {repo_url} into {path}")
         return path
     except subprocess.CalledProcessError:
-        print(f"[Error] Failed to clone {repo_url}")
+        logging.info(f"[Error] Failed to clone {repo_url}")
         return None
     
 
 def initiate_local_directory(repo_url, path):
     # Check if the local directory exists
     if not os.path.isdir(repo_url):
-        print(f"[Error] Local directory: [{repo_url}] does not exist")
+        logging.info(f"[Error] Local directory: [{repo_url}] does not exist")
         return None
     else:
-        print(f"[Success] Local directory: [{repo_url}] is valid")
+        logging.info(f"[Success] Local directory: [{repo_url}] is valid")
         path = repo_url
         return path
 
@@ -127,7 +136,7 @@ def compare_directories(source_directory, target_directory, source_url, target_u
         }
     }
     
-    print(json.dumps(comparison_result, indent=2))
+    logging.info(json.dumps(comparison_result, indent=2))
     return comparison_result
 
 
@@ -144,7 +153,7 @@ def checkout_repo(path, branch, commit):
     try:
         # If the branch input is empty, we should use the default branch
         if not branch:
-            print("[Info] No branch specified, checking default branch ...")
+            logging.info("[Info] No branch specified, checking default branch ...")
             # Get default branch if none specified
             default_branch = subprocess.check_output(
                 ["git", "symbolic-ref", "--short", "HEAD"], 
@@ -152,14 +161,14 @@ def checkout_repo(path, branch, commit):
                 text=True
             ).strip()
             branch = default_branch
-            print(f"[Info] Using default branch: {branch}")
+            logging.info(f"[Info] Using default branch: {branch}")
         else:
             # Run fetch to make sure the branch is okay
             subprocess.run(["git", "fetch"], check=True)
 
         # If the branch input is not empty, the if above will not run and the value will remain what the initial input was
         subprocess.run(["git", "checkout", branch], check=True)
-        print(f"[Success] Checked out branch: {branch}")
+        logging.info(f"[Success] Checked out branch: {branch}")
 
         # If a commit value was provided, check if it exists in the current branch. If it does, then reset to it
         if commit:
@@ -167,9 +176,9 @@ def checkout_repo(path, branch, commit):
                 subprocess.run(["git", "rev-parse", "--verify", commit], check=True)
                 # If the check passed, reset to the commit
                 subprocess.run(["git", "reset", "--hard", commit], check=True)
-                print(f"[Success] Reset to commit: {commit}")
+                logging.info(f"[Success] Reset to commit: {commit}")
             except subprocess.CalledProcessError:
-                print(f"[Error] Commit {commit} does not exist in branch {branch}")
+                logging.info(f"[Error] Commit {commit} does not exist in branch {branch}")
                 # Reset back to the original directory
                 os.chdir(original_dir)
                 return False
@@ -179,7 +188,7 @@ def checkout_repo(path, branch, commit):
         os.chdir(original_dir)
         return True
     except Exception as e:
-        print(f"[Error] Git operation failed: {str(e)}")
+        logging.info(f"[Error] Git operation failed: {str(e)}")
         # Reset back to the original directory
         os.chdir(original_dir)
         return False
@@ -218,25 +227,25 @@ def main():
     else:
         source_repo_path = initiate_local_directory(source_url, "source_repo")
     if source_repo_path is None:
-        print(f"[Error] Directory [{source_url}] could not be initialized.")
+        logging.info(f"[Error] Directory [{source_url}] could not be initialized.")
         return
-    print(f"[Info] Source repo path: {source_repo_path}")
+    logging.info(f"[Info] Source repo path: {source_repo_path}")
     # Code for target
     if is_remote_repository(target_url):
         target_repo_path = initiate_remote_directory(target_url, "target_repo")
     else:
         target_repo_path = initiate_local_directory(target_url, "target_repo")
     if target_repo_path is None:
-        print(f"[Error] Directory [{target_url}] could not be initialized.")
+        logging.info(f"[Error] Directory [{target_url}] could not be initialized.")
         return
-    print(f"[Info] Target repo path: {target_repo_path}")
+    logging.info(f"[Info] Target repo path: {target_repo_path}")
 
     # If the function returns false, print error and return to main - need to see how to print errors to users in Jenkins for UX
     if not checkout_repo(source_repo_path, source_branch, source_commit):
-        print(f"[Error] Failed to checkout source repo. Please check the logs.")
+        logging.info(f"[Error] Failed to checkout source repo. Please check the logs.")
         return
     if not checkout_repo(target_repo_path, target_branch, target_commit):
-        print(f"[Error] Failed to checkout target repo. Please check the logs.")
+        logging.info(f"[Error] Failed to checkout target repo. Please check the logs.")
         return
 
     # Compare the two directories/repos. Returns a JSON object
