@@ -39,6 +39,7 @@
 | T003   | For adding base Python script and a valid Jenkinsfile |
 | T004   | For working on the Python comparison file |
 | T005   | For updating the Jenkins file to work with T004 Python script |
+| T006   | For adding requirements for the Python script |
 
 # Sources
 | Resource | Links |
