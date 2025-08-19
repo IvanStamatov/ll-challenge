@@ -1,25 +1,10 @@
-# Task is to have a script that compares:
-# [X] Directories and the files within them - Completed
-# [ ] Compare commits and tags in Git repos - Completed only commits
-# [X] Output to be used by other scripts
-# [ ] Output as HTML report
-# [ ] Store the JSON file with the names of the repos
-# ===============
-# Validations:
-# [X] If the input is not empty 
-# [X] If the repo URL exists and is accessible(permission)
-# [X] Check if it is a local dir or URL to remote repo
-# ===============
-# Decisions:
-# - Input would be limited to only two directories
-#   - Can be done with a dictionary of repo_url:argument (commit/tag/path)
-
 import requests # Needed to check if the remote repository is accessible
 import os # Needed to navigate/check local directories
 import filecmp # Needed to compare directories - Will try homemade approach as well
 import subprocess # To run commands with external packages/git/aws
 import json # For capturing the comparison results
 import argparse # For getting arguments from the Jenkins pipeline
+
 
 # Function to check if the input is for a remote repo or a local dir
 def is_remote_repository(repo_url):
@@ -35,6 +20,7 @@ def is_remote_repository(repo_url):
     else:
         print(f"[Info] Detected local directory: [{repo_url}]")
         return False
+
 
 # Split into two functions based on if the repo is remote or local
 def initiate_remote_directory(repo_url, path):
@@ -144,6 +130,7 @@ def compare_directories(source_directory, target_directory, source_url, target_u
     print(json.dumps(comparison_result, indent=2))
     return comparison_result
 
+
 def checkout_repo(path, branch, commit):
     # Here, we have all local repos - the remotes ones are downloaded already
     # We need to go to the local path, checkout the given branch and reset to the specified commit
@@ -197,31 +184,17 @@ def checkout_repo(path, branch, commit):
         os.chdir(original_dir)
         return False
 
+
 def main():
-    # Group variables by source and target - This blocks development for comparing more than 2 dirs
-    # Temporary section - input to be provided by Jenkins Parameters
-    # https://github.com/rust-lang/rustlings
-
-
-
-
-    # I do not want to use sys.argv like $1, $2
-    # Using argparse: https://docs.python.org/2/library/argparse.html
-    # Set up argument parser
+    # Set up argument parser - Avoiding using sys.argv
     parser = argparse.ArgumentParser(description='Compare directories')
     
     # Source section
-    # source_url = "https://github.com/inancgumus/learngo"
-    # source_branch = ""
-    # source_commit = ""
     parser.add_argument('--source-repo-url', required=True, help='URL or path to source repository')
     parser.add_argument('--source-repo-branch', default='', help='Branch to checkout in source repository')
     parser.add_argument('--source-repo-commit', default='', help='Commit to checkout in source repository')
 
     # Target section
-    # target_url = "https://github.com/inancgumus/learngo"
-    # target_branch = ""
-    # target_commit = ""
     parser.add_argument('--target-repo-url', required=True, help='URL or path to target repository')
     parser.add_argument('--target-repo-branch', default='', help='Branch to checkout in target repository')
     parser.add_argument('--target-repo-commit', default='', help='Commit to checkout in target repository')
@@ -237,7 +210,6 @@ def main():
     target_url = args.target_repo_url
     target_branch = args.target_repo_branch
     target_commit = args.target_repo_commit
-
 
     # Establish the repo/dir and return a path to be checked. If remote, the path is a custom folder, if local, the path is the input
     # Code for source

@@ -40,6 +40,7 @@
 | T004   | For working on the Python comparison file |
 | T005   | For updating the Jenkins file to work with T004 Python script |
 | T006   | For adding requirements for the Python script |
+| T007   | For cleaning up code and comments |
 
 # Sources
 | Resource | Links |
