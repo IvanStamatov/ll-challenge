@@ -21,56 +21,64 @@ import filecmp # Needed to compare directories - Will try homemade approach as w
 import subprocess # To run commands with external packages/git/aws
 import json # For capturing the comparison results
 
-def initiate_directory(repo_url, path):
+
+def is_remote_repository(repo_url):
     # Check if the input is empty
     if not repo_url:
         print("[Error] Provided value for repository is empty ")
         return None
-
+    
     # Check if the input is a local directory or a URL
     if repo_url.startswith("http://") or repo_url.startswith("https://"):
         print(f"[Info] Detected remote repository URL: [{repo_url}]")
-        # Check if the URL is accessible
-        try:
-            response = requests.head(repo_url)
-            if response.status_code != 200:
-                print(f"[Error] Remote repository: [{repo_url}] is not accessible")
-                return None
-            else:
-                print(f"[Success] Remote repository: [{repo_url}] is accessible")
-        except requests.RequestException as e:
-            print(f"[Error] Invalid Repository URL: [{repo_url}]")
-            return None
-        # Now that the URL is accessible, clone the remote repo
-        print(f"[Info] Cloning the remote repo: [{repo_url}]")
-        # TODO check if the path exists
-        try:
-            subprocess.run(["git", "clone", repo_url, path], check=True)
-            print(f"[Success] Cloned {repo_url} into {path}")
-            return path
-        except subprocess.CalledProcessError:
-            print(f"[Error] Failed to clone {repo_url}")
+        return True
     else:
         print(f"[Info] Detected local directory: [{repo_url}]")
-        # Check if the local directory exists
-        if not os.path.isdir(repo_url):
-            print(f"[Error] Local directory: [{repo_url}] does not exist")
+        return False
+
+
+def initiate_remote_directory(repo_url, path):
+    try:
+        response = requests.get(repo_url)
+        if response.status_code != 200:
+            print(f"[Error] Remote repository: [{repo_url}] is not accessible (HTTP {response.status_code})")
             return None
         else:
-            print(f"[Success] Local directory: [{repo_url}] is valid")
-            path = repo_url
-            return path
+            print(f"[Success] Remote repository: [{repo_url}] is accessible")
+    except requests.RequestException as e:
+        print(f"[Error] Invalid Repository URL: [{repo_url}]")
+        return None
 
+    print(f"[Info] Cloning the remote repo: [{repo_url}]")
+    # TODO check if the path exists
+    try:
+        subprocess.run(["git", "clone", repo_url, path], check=True)
+        print(f"[Success] Cloned {repo_url} into {path}")
+        return path
+    except subprocess.CalledProcessError:
+        print(f"[Error] Failed to clone {repo_url}")
+        return None
+
+
+def initiate_local_directory(repo_url, path):
+    # Check if the local directory exists
+    if not os.path.isdir(repo_url):
+        print(f"[Error] Local directory: [{repo_url}] does not exist")
+        return None
+    else:
+        print(f"[Success] Local directory: [{repo_url}] is valid")
+        path = repo_url
+        return path
 
 # Function to compare two directories
-def compare_directories(directory_1, directory_2):
+def compare_directories(source_directory, target_directory):
     # Compare the two directories
-    directory_comparison_object = filecmp.dircmp(directory_1, directory_2)
+    directory_comparison_object = filecmp.dircmp(source_directory, target_directory)
 
     # Populate JSON with the results from the filecmp
     comparison_result = {
-        "source_directory": directory_1,
-        "target_directory": directory_2,
+        "source_directory": source_directory,
+        "target_directory": target_directory,
         "comparison": {
             "common_files": directory_comparison_object.common_files,
             "source_only": directory_comparison_object.left_only,
@@ -86,25 +94,40 @@ def compare_directories(directory_1, directory_2):
 
 
 def main():
+    # Group variables by source and target - This blocks development for comparing more than 2 dirs
     # Temporary section, input might be a list
-    directory_1 = "https://github.com/IvanStamatov/ll-challenge"
-    directory_2 = "https://github.com/IvanStamatov/ll-challenge"
-
-    # Make a list from the two variables
-    directories = [directory_1, directory_2]
-    # Validate each directory/repo
-    source_repo_path = initiate_directory(directories[0], "source_repo")
-    target_repo_path = initiate_directory(directories[1], "target_repo")
-
-    if source_repo_path is None:
-        print(f"[Error] Directory [{directories[0]}] could not be initialized.")
-        return
-    if target_repo_path is None:
-        print(f"[Error] Directory [{directories[1]}] could not be initialized.")
-        return
+    source_directory = "https://github.com/rust-lang/rustlings"
+    target_directory = "https://github.com/inancgumus/learngo"
     
+    # Now to check commits, but branch?
+    # Can be like if branch is not provided, then use main/master/default
+    # Check for commit in that branch
+    # "Main" Branches can be either main/master - differs from repo to repo
+    source_branch = "main"
+    source_commit = ""
+    target_branch = "main"
+    target_commit = ""
+
+    # Establish the repo/dir and return a path to be checked. If remote, the path is a custom folder, if local, the path is the input
+    # Code for source
+    if is_remote_repository(source_directory):
+        source_repo_path = initiate_remote_directory(source_directory, "source_repo")
+    else:
+        source_repo_path = initiate_local_directory(source_directory, "source_repo")
+    if source_repo_path is None:
+        print(f"[Error] Directory [{source_directory}] could not be initialized.")
+        return
     print(f"[Info] Source repo path: {source_repo_path}")
+    # Code for target
+    if is_remote_repository(target_directory):
+        target_repo_path = initiate_remote_directory(target_directory, "target_repo")
+    else:
+        target_repo_path = initiate_local_directory(target_directory, "target_repo")
+    if target_repo_path is None:
+        print(f"[Error] Directory [{target_directory}] could not be initialized.")
+        return
     print(f"[Info] Target repo path: {target_repo_path}")
+
 
     # Compare the two directories/repos. Returns a JSON object
     compare_directories(source_repo_path, target_repo_path)
