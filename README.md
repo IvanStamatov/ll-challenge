@@ -1,12 +1,14 @@
 # About
 - Repository for Jenkins pipeline as an exercise
 
-# Repository content
-- Bash and Python scripts 
-- Jenkinsfile
-- README.md
-- Diagram of project
-- User guide
+# Task
+- Task is to have a Jenkins pipeline with Python code, that compares two repositories/directories.
+- The pipeline should generate an artifact, which should be stored in an S3 bucket.
+
+# TODO
+- Parsing the input
+    - If the a git repo URL is given without https/http
+- Reset cloned remote repositories by tag (currently it is only possible by branch and commit)
 
 # How to use pipeline
 - To be added later on
