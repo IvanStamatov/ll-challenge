@@ -1,12 +1,14 @@
 # About
 - Repository for Jenkins pipeline as an exercise
 
-# Repository content
-- Bash and Python scripts 
-- Jenkinsfile
-- README.md
-- Diagram of project
-- User guide
+# Task
+- Task is to have a Jenkins pipeline with Python code, that compares two repositories/directories.
+- The pipeline should generate an artifact, which should be stored in an S3 bucket.
+
+# TODO
+- Parsing the input
+    - If the a git repo URL is given without https/http
+- Reset cloned remote repositories by tag (currently it is only possible by branch and commit)
 
 # How to use pipeline
 - To be added later on
@@ -39,6 +41,8 @@
 | T003   | For adding base Python script and a valid Jenkinsfile |
 | T004   | For working on the Python comparison file |
 | T005   | For updating the Jenkins file to work with T004 Python script |
+| T006   | For adding requirements for the Python script |
+| T007   | For cleaning up code and comments |
 
 # Sources
 | Resource | Links |
@@ -48,3 +52,4 @@
 | Jenkins in Docker | [Jenkins in Docker Installation Guide](https://www.jenkins.io/doc/book/installing/docker/) |
 | Jenkins Pipeline | [Jenkins Pipelines Official Guide](https://www.jenkins.io/doc/book/pipeline/) |
 | Compare dirs in Python | [fimecmp package](https://docs.python.org/3/library/filecmp.html) |
+| Argparse in Python | [argparse](https://docs.python.org/2/library/argparse.html) |
