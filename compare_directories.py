@@ -6,6 +6,8 @@ import json # For capturing the comparison results
 import argparse # For getting arguments from the Jenkins pipeline
 import sys # For exiting the script with an error code
 import logging # To replace print statements and provide proper logging
+import boto3 # For S3 upload
+from datetime import datetime # Used in naming the artifact
 
 # Setting up the logging messages
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -135,7 +137,23 @@ def compare_directories(source_directory, target_directory, source_url, target_u
     }
     # Print the JSON to the terminal - Useful for troubleshooting
     logging.info(json.dumps(comparison_result, indent=2))
-    return comparison_result
+
+    # The file is named comparison_YYMMDD_HHMM.json
+    # Then we can search each file for the directory name combo (branches, commits) - it would be a hassle to put everything in the filename 
+    timestamp = datetime.now().strftime('%y%m%d_%H%M')
+    filename = f"comparison_{timestamp}.json"
+
+    try:
+        with open(filename, 'w') as f:
+            json.dump(comparison_result, f, indent=2)
+        logging.info(f"[Success] Comparison result saved to: {filename}")
+    except Exception as e:
+        raise ValidationError(f"Failed to save comparison result: {str(e)}")
+    
+    # Return the full file path so we can use it to upload to S3
+    full_path = os.path.abspath(filename)
+    logging.info(f"[Success] Comparison file's full path: {full_path}")
+    return full_path
 
 
 def checkout_repo(path, branch, commit):
@@ -187,6 +205,36 @@ def checkout_repo(path, branch, commit):
         raise ValidationError(f"[Error] Git operation failed: {str(e)}")
 
 
+def upload_file(comparison_file_path, bucket_name, object_name=None):
+    try:
+        # Check if bucket name is provided
+        if not bucket_name:
+            raise ValidationError(f"S3 upload failed: No bucket specified")
+
+        # Create S3 client
+        s3_client = boto3.client('s3')
+        if object_name is None:
+            object_name = os.path.basename(comparison_file_path)
+        
+        # Check if the file exists before uploading
+        if not os.path.exists(comparison_file_path):
+            raise ValidationError(f"File not found: {comparison_file_path}")
+
+        # Upload the file
+        s3_client.upload_file(comparison_file_path, bucket_name, object_name)
+        
+        # Generate S3 URL
+        s3_url = f"https://{bucket_name}.s3.amazonaws.com/{object_name}"
+        logging.info(f"[Success] Uploaded to S3: {s3_url}")
+
+        return s3_url
+    except boto3.exceptions.Boto3Error as e:
+        logging.error(f"[Error] AWS/Boto3 error during S3 upload: {str(e)}")
+        raise ValidationError(f"S3 upload failed: {str(e)}")
+    except Exception as e:
+        logging.error(f"[Error] Failed to upload to S3: {str(e)}")
+        raise ValidationError(f"S3 upload failed: {str(e)}")
+
 
 def main():
     # Set up argument parser - Avoiding using sys.argv
@@ -201,7 +249,10 @@ def main():
     parser.add_argument('--target-repo-url', required=True, help='URL or path to target repository')
     parser.add_argument('--target-repo-branch', default='', help='Branch to checkout in target repository')
     parser.add_argument('--target-repo-commit', default='', help='Commit to checkout in target repository')
-    
+
+    # For the AWS S3 bucket
+    parser.add_argument('--s3-bucket', default='', help='S3 bucket endpoint')
+
     # Parse arguments
     args = parser.parse_args()
     
@@ -213,6 +264,8 @@ def main():
     target_url = args.target_repo_url
     target_branch = args.target_repo_branch
     target_commit = args.target_repo_commit
+
+    s3_bucket = args.s3_bucket
 
     # Establish the repo/dir and return a path to be checked. 
     # If remote, the path is a custom folder. 
@@ -234,7 +287,10 @@ def main():
     checkout_repo(target_repo_path, target_branch, target_commit)
 
     # Compare the two directories/repos. Returns a JSON object
-    compare_directories(source_repo_path, target_repo_path, source_url, target_url)
+    comparison_file_path = compare_directories(source_repo_path, target_repo_path, source_url, target_url)
+    
+    s3_url = upload_file(comparison_file_path, s3_bucket)
+    logging.info(f"[Success] Comparison complete. File available at: {s3_url}")
 
 
 if __name__ == "__main__":
