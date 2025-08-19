@@ -1,15 +1,14 @@
 # Task is to have a script that compares:
-# - directories and the files within them.
-# - compare commits and tags in Git repos
+# [X] Directories and the files within them - Completed
+# [ ] Compare commits and tags in Git repos - Completed only commits
+# [X] Output to be used by other scripts
+# [ ] Output as HTML report
+# [ ] Store the JSON file with the names of the repos
 # ===============
-# This means that we needs to validate:
-# 1) If the input is not empty 
-# 2) If the repo URL exists and is accessible(permission)
-# ? Check if it is a local dir or URL to remote repo
-# ===============
-# Output
-# There are no specific requirements for the output format, but it should be clear, structured and convenient for processing by another script or program.
-# First though is JSON - it can be used to make an HTML report for humans, while being perfect for scripts/pipelines
+# Validations:
+# [X] If the input is not empty 
+# [X] If the repo URL exists and is accessible(permission)
+# [X] Check if it is a local dir or URL to remote repo
 # ===============
 # Decisions:
 # - Input would be limited to only two directories
@@ -21,93 +20,224 @@ import filecmp # Needed to compare directories - Will try homemade approach as w
 import subprocess # To run commands with external packages/git/aws
 import json # For capturing the comparison results
 
-def initiate_directory(repo_url, path):
+# Function to check if the input is for a remote repo or a local dir
+def is_remote_repository(repo_url):
     # Check if the input is empty
     if not repo_url:
         print("[Error] Provided value for repository is empty ")
         return None
-
+    
     # Check if the input is a local directory or a URL
     if repo_url.startswith("http://") or repo_url.startswith("https://"):
         print(f"[Info] Detected remote repository URL: [{repo_url}]")
-        # Check if the URL is accessible
-        try:
-            response = requests.head(repo_url)
-            if response.status_code != 200:
-                print(f"[Error] Remote repository: [{repo_url}] is not accessible")
-                return None
-            else:
-                print(f"[Success] Remote repository: [{repo_url}] is accessible")
-        except requests.RequestException as e:
-            print(f"[Error] Invalid Repository URL: [{repo_url}]")
-            return None
-        # Now that the URL is accessible, clone the remote repo
-        print(f"[Info] Cloning the remote repo: [{repo_url}]")
-        # TODO check if the path exists
-        try:
-            subprocess.run(["git", "clone", repo_url, path], check=True)
-            print(f"[Success] Cloned {repo_url} into {path}")
-            return path
-        except subprocess.CalledProcessError:
-            print(f"[Error] Failed to clone {repo_url}")
+        return True
     else:
         print(f"[Info] Detected local directory: [{repo_url}]")
-        # Check if the local directory exists
-        if not os.path.isdir(repo_url):
-            print(f"[Error] Local directory: [{repo_url}] does not exist")
+        return False
+
+# Split into two functions based on if the repo is remote or local
+def initiate_remote_directory(repo_url, path):
+    try:
+        response = requests.get(repo_url)
+        if response.status_code != 200:
+            print(f"[Error] Remote repository: [{repo_url}] is not accessible (HTTP {response.status_code})")
             return None
         else:
-            print(f"[Success] Local directory: [{repo_url}] is valid")
-            path = repo_url
-            return path
+            print(f"[Success] Remote repository: [{repo_url}] is accessible")
+    except requests.RequestException as e:
+        print(f"[Error] Invalid Repository URL: [{repo_url}]")
+        return None
+
+    print(f"[Info] Cloning the remote repo: [{repo_url}]")
+
+    # Remove the folder if it exists already - Could be a better way to ensure important files/paths do not get deleted (case: if path name matches another folder)
+    if os.path.exists(path):
+        print(f"[Info] Removing existing directory: [{path}]")
+        subprocess.run(["rm", "-rf", path], check=True)
+    
+    try:
+        subprocess.run(["git", "clone", repo_url, path], check=True)
+        print(f"[Success] Cloned {repo_url} into {path}")
+        return path
+    except subprocess.CalledProcessError:
+        print(f"[Error] Failed to clone {repo_url}")
+        return None
+    
+
+def initiate_local_directory(repo_url, path):
+    # Check if the local directory exists
+    if not os.path.isdir(repo_url):
+        print(f"[Error] Local directory: [{repo_url}] does not exist")
+        return None
+    else:
+        print(f"[Success] Local directory: [{repo_url}] is valid")
+        path = repo_url
+        return path
 
 
 # Function to compare two directories
-def compare_directories(directory_1, directory_2):
-    # Compare the two directories
-    directory_comparison_object = filecmp.dircmp(directory_1, directory_2)
+def compare_directories(source_directory, target_directory, source_url, target_url):
+    # ISSUE - filecmp does compare the content - it did not show actual changes when testing
+    # Google, Reddit and Stackoverflow point to combining filecmp with os.walk 
 
-    # Populate JSON with the results from the filecmp
+    def get_all_files(directory):
+        file_paths = []
+        for root, dirs, files in os.walk(directory):
+            # Remove any .git paths as we do not want to check/compare those yet
+            if '.git' in dirs:
+                dirs.remove('.git')
+                
+            for file in files:
+                # Get path relative to the base directory
+                full_path = os.path.join(root, file)
+                rel_path = os.path.relpath(full_path, directory)
+                file_paths.append(rel_path)
+        return sorted(file_paths)
+        # Now we have an array of file paths that we can compare to eachother
+    
+    # Create an array of all files in each local repo
+    source_repo_files = get_all_files(source_directory)
+    target_repo_files = get_all_files(target_directory)
+    
+    # Set up empty arrays beforehand
+    common_identical_files = []
+    different_content_files = []
+    
+    source_only_files_array = [f for f in source_repo_files if f not in target_repo_files]
+    target_only_files_array = [f for f in target_repo_files if f not in source_repo_files]
+    
+    # For each file path in each local repo - add the original dir at the start so that the script can reach the file
+    for file in set(source_repo_files) & set(target_repo_files):
+        source_file = os.path.join(source_directory, file)
+        target_file = os.path.join(target_directory, file)
+        
+        # Now compare the files with filecmp - Add to each array based on if they are the same of not
+        if filecmp.cmp(source_file, target_file, shallow=False):
+            common_identical_files.append(file)
+        else:
+            different_content_files.append(file)
+    
+    # Append the result in a structured JSON format
     comparison_result = {
-        "source_directory": directory_1,
-        "target_directory": directory_2,
+        "source_directory": source_directory,
+        "target_directory": target_directory,
+        "source_directory_name": source_url,
+        "target_directory_name": target_url,
         "comparison": {
-            "common_files": directory_comparison_object.common_files,
-            "source_only": directory_comparison_object.left_only,
-            "target_only": directory_comparison_object.right_only,
-            "different_files": directory_comparison_object.diff_files,
-            "identical_files": len(directory_comparison_object.left_only) == 0 
-                        and len(directory_comparison_object.right_only) == 0 
-                        and len(directory_comparison_object.diff_files) == 0
+            "common_identical_files": common_identical_files,
+            "different_content_files": different_content_files,
+            "source_only_files": source_only_files_array,
+            "target_only_files": target_only_files_array,
+            "repos_identical": len(source_only_files_array) == 0 and len(target_only_files_array) == 0 and len(different_content_files) == 0,
+            "statistics": {
+                "total_files_source": len(source_repo_files),
+                "total_files_target": len(target_repo_files),
+                "identical_files": len(common_identical_files),
+                "different_files": len(different_content_files),
+                "source_only": len(source_only_files_array),
+                "target_only": len(target_only_files_array)
+            }
         }
     }
+    
     print(json.dumps(comparison_result, indent=2))
     return comparison_result
 
+def checkout_repo(path, branch, commit):
+    # Here, we have all local repos - the remotes ones are downloaded already
+    # We need to go to the local path, checkout the given branch and reset to the specified commit
+
+    # Get current dir on server so that we can go back after the checkout
+    original_dir = os.getcwd()
+
+    # Go into the repo folder
+    os.chdir(path)
+
+    try:
+        # If the branch input is empty, we should use the default branch
+        if not branch:
+            print("[Info] No branch specified, checking default branch ...")
+            # Get default branch if none specified
+            default_branch = subprocess.check_output(
+                ["git", "symbolic-ref", "--short", "HEAD"], 
+                stderr=subprocess.STDOUT,
+                text=True
+            ).strip()
+            branch = default_branch
+            print(f"[Info] Using default branch: {branch}")
+        else:
+            # Run fetch to make sure the branch is okay
+            subprocess.run(["git", "fetch"], check=True)
+
+        # If the branch input is not empty, the if above will not run and the value will remain what the initial input was
+        subprocess.run(["git", "checkout", branch], check=True)
+        print(f"[Success] Checked out branch: {branch}")
+
+        # If a commit value was provided, check if it exists in the current branch. If it does, then reset to it
+        if commit:
+            try:
+                subprocess.run(["git", "rev-parse", "--verify", commit], check=True)
+                # If the check passed, reset to the commit
+                subprocess.run(["git", "reset", "--hard", commit], check=True)
+                print(f"[Success] Reset to commit: {commit}")
+            except subprocess.CalledProcessError:
+                print(f"[Error] Commit {commit} does not exist in branch {branch}")
+                # Reset back to the original directory
+                os.chdir(original_dir)
+                return False
+
+        # If there is no commit value provided, we can assume the user wants the latest commit
+        # Reset back to the original directory
+        os.chdir(original_dir)
+        return True
+    except Exception as e:
+        print(f"[Error] Git operation failed: {str(e)}")
+        # Reset back to the original directory
+        os.chdir(original_dir)
+        return False
 
 def main():
-    # Temporary section, input might be a list
-    directory_1 = "https://github.com/IvanStamatov/ll-challenge"
-    directory_2 = "https://github.com/IvanStamatov/ll-challenge"
+    # Group variables by source and target - This blocks development for comparing more than 2 dirs
+    # Temporary section - input to be provided by Jenkins Parameters
+    # https://github.com/rust-lang/rustlings
+    source_url = "https://github.com/inancgumus/learngo"
+    source_branch = ""
+    source_commit = ""
 
-    # Make a list from the two variables
-    directories = [directory_1, directory_2]
-    # Validate each directory/repo
-    source_repo_path = initiate_directory(directories[0], "source_repo")
-    target_repo_path = initiate_directory(directories[1], "target_repo")
+    target_url = "https://github.com/inancgumus/learngo"
+    target_branch = ""
+    target_commit = ""
 
+    # Establish the repo/dir and return a path to be checked. If remote, the path is a custom folder, if local, the path is the input
+    # Code for source
+    if is_remote_repository(source_url):
+        source_repo_path = initiate_remote_directory(source_url, "source_repo")
+    else:
+        source_repo_path = initiate_local_directory(source_url, "source_repo")
     if source_repo_path is None:
-        print(f"[Error] Directory [{directories[0]}] could not be initialized.")
+        print(f"[Error] Directory [{source_url}] could not be initialized.")
         return
-    if target_repo_path is None:
-        print(f"[Error] Directory [{directories[1]}] could not be initialized.")
-        return
-    
     print(f"[Info] Source repo path: {source_repo_path}")
+    # Code for target
+    if is_remote_repository(target_url):
+        target_repo_path = initiate_remote_directory(target_url, "target_repo")
+    else:
+        target_repo_path = initiate_local_directory(target_url, "target_repo")
+    if target_repo_path is None:
+        print(f"[Error] Directory [{target_url}] could not be initialized.")
+        return
     print(f"[Info] Target repo path: {target_repo_path}")
 
+    # If the function returns false, print error and return to main - need to see how to print errors to users in Jenkins for UX
+    if not checkout_repo(source_repo_path, source_branch, source_commit):
+        print(f"[Error] Failed to checkout source repo. Please check the logs.")
+        return
+    if not checkout_repo(target_repo_path, target_branch, target_commit):
+        print(f"[Error] Failed to checkout target repo. Please check the logs.")
+        return
+
     # Compare the two directories/repos. Returns a JSON object
-    compare_directories(source_repo_path, target_repo_path)
+    compare_directories(source_repo_path, target_repo_path, source_url, target_url)
 
 
 if __name__ == "__main__":
