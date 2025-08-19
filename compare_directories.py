@@ -138,6 +138,11 @@ def compare_directories(source_directory, target_directory, source_url, target_u
     # Print the JSON to the terminal - Useful for troubleshooting
     logging.info(json.dumps(comparison_result, indent=2))
 
+    # Remove old comparison files before creating new one
+    for file in os.listdir('.'):
+        if file.startswith('comparison_') and file.endswith('.json'):
+            os.remove(file)
+
     # The file is named comparison_YYMMDD_HHMM.json
     # Then we can search each file for the directory name combo (branches, commits) - it would be a hassle to put everything in the filename 
     timestamp = datetime.now().strftime('%y%m%d_%H%M')
