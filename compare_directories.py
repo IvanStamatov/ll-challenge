@@ -25,24 +25,23 @@ def is_remote_repository(repo_url):
     # Check if the input is a local directory or a URL
     if repo_url.startswith("http://") or repo_url.startswith("https://"):
         logging.info(f"[Info] Detected remote repository URL: [{repo_url}]")
+        # Return that the repository is remote - true
         return True
     else:
         logging.info(f"[Info] Detected local directory: [{repo_url}]")
+        # Return that the repository is not remote - false
         return False
 
 
-# Split into two functions based on if the repo is remote or local
 def initiate_remote_directory(repo_url, path):
     try:
         response = requests.get(repo_url)
         if response.status_code != 200:
-            logging.info(f"[Error] Remote repository: [{repo_url}] is not accessible (HTTP {response.status_code})")
-            return None
+            raise ValidationError(f"[Error] Remote repository: [{repo_url}] is not accessible (HTTP {response.status_code})")
         else:
             logging.info(f"[Success] Remote repository: [{repo_url}] is accessible")
     except requests.RequestException as e:
-        logging.info(f"[Error] Invalid Repository URL: [{repo_url}]")
-        return None
+        raise ValidationError(f"[Error] Invalid Repository URL: [{repo_url}]")
 
     logging.info(f"[Info] Cloning the remote repo: [{repo_url}]")
 
@@ -51,20 +50,19 @@ def initiate_remote_directory(repo_url, path):
         logging.info(f"[Info] Removing existing directory: [{path}]")
         subprocess.run(["rm", "-rf", path], check=True)
     
+    # Clone the remote repository to a local directory
     try:
         subprocess.run(["git", "clone", repo_url, path], check=True)
         logging.info(f"[Success] Cloned {repo_url} into {path}")
         return path
     except subprocess.CalledProcessError:
-        logging.info(f"[Error] Failed to clone {repo_url}")
-        return None
+        raise ValidationError(f"[Error] Failed to clone {repo_url}")
     
 
 def initiate_local_directory(repo_url, path):
     # Check if the local directory exists
     if not os.path.isdir(repo_url):
-        logging.info(f"[Error] Local directory: [{repo_url}] does not exist")
-        return None
+        raise ValidationError(f"[Error] Local directory: [{repo_url}] does not exist")
     else:
         logging.info(f"[Success] Local directory: [{repo_url}] is valid")
         path = repo_url
@@ -135,7 +133,7 @@ def compare_directories(source_directory, target_directory, source_url, target_u
             }
         }
     }
-    
+    # Print the JSON to the terminal - Useful for troubleshooting
     logging.info(json.dumps(comparison_result, indent=2))
     return comparison_result
 
@@ -178,10 +176,7 @@ def checkout_repo(path, branch, commit):
                 subprocess.run(["git", "reset", "--hard", commit], check=True)
                 logging.info(f"[Success] Reset to commit: {commit}")
             except subprocess.CalledProcessError:
-                logging.info(f"[Error] Commit {commit} does not exist in branch {branch}")
-                # Reset back to the original directory
-                os.chdir(original_dir)
-                return False
+                raise ValidationError(f"[Error] Commit {commit} does not exist in branch {branch}")
 
         # If there is no commit value provided, we can assume the user wants the latest commit
         # Reset back to the original directory
@@ -189,9 +184,8 @@ def checkout_repo(path, branch, commit):
         return True
     except Exception as e:
         logging.info(f"[Error] Git operation failed: {str(e)}")
-        # Reset back to the original directory
-        os.chdir(original_dir)
-        return False
+        raise ValidationError(f"[Error] Git operation failed: {str(e)}")
+
 
 
 def main():
@@ -220,33 +214,24 @@ def main():
     target_branch = args.target_repo_branch
     target_commit = args.target_repo_commit
 
-    # Establish the repo/dir and return a path to be checked. If remote, the path is a custom folder, if local, the path is the input
+    # Establish the repo/dir and return a path to be checked. 
+    # If remote, the path is a custom folder. 
+    # If local, the path is the input.
     # Code for source
     if is_remote_repository(source_url):
         source_repo_path = initiate_remote_directory(source_url, "source_repo")
     else:
         source_repo_path = initiate_local_directory(source_url, "source_repo")
-    if source_repo_path is None:
-        logging.info(f"[Error] Directory [{source_url}] could not be initialized.")
-        return
     logging.info(f"[Info] Source repo path: {source_repo_path}")
+    checkout_repo(source_repo_path, source_branch, source_commit)
+
     # Code for target
     if is_remote_repository(target_url):
         target_repo_path = initiate_remote_directory(target_url, "target_repo")
     else:
         target_repo_path = initiate_local_directory(target_url, "target_repo")
-    if target_repo_path is None:
-        logging.info(f"[Error] Directory [{target_url}] could not be initialized.")
-        return
     logging.info(f"[Info] Target repo path: {target_repo_path}")
-
-    # If the function returns false, print error and return to main - need to see how to print errors to users in Jenkins for UX
-    if not checkout_repo(source_repo_path, source_branch, source_commit):
-        logging.info(f"[Error] Failed to checkout source repo. Please check the logs.")
-        return
-    if not checkout_repo(target_repo_path, target_branch, target_commit):
-        logging.info(f"[Error] Failed to checkout target repo. Please check the logs.")
-        return
+    checkout_repo(target_repo_path, target_branch, target_commit)
 
     # Compare the two directories/repos. Returns a JSON object
     compare_directories(source_repo_path, target_repo_path, source_url, target_url)
