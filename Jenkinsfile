@@ -36,5 +36,24 @@ pipeline {
                     --s3-bucket '${params.S3_BUCKET}'"""
             }
         }
+        stage('Update Build Description') {
+            steps {
+                script {
+                    // Read the JSON result and update build description
+                    def jsonContent = readFile('comparison_*.json')
+                    def result = readJSON text: jsonContent
+                    def stats = result.comparison.statistics
+
+                    currentBuild.description = """
+                    📊 Comparison Results:
+                    • Identical: ${stats.identical_files}
+                    • Different: ${stats.different_files}  
+                    • Source Only: ${stats.source_only}
+                    • Target Only: ${stats.target_only}
+                    • Status: ${result.comparison.repos_identical ? 'Identical' : 'Different'}
+                    """
+                }
+            }
+        }
     }
 }
