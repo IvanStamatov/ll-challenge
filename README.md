@@ -9,6 +9,8 @@
 - Parsing the input
     - If the a git repo URL is given without https/http
 - Reset cloned remote repositories by tag (currently it is only possible by branch and commit)
+- Visualize output for humans
+- Search S3 bucket for previous matching comparison
 
 # How to use pipeline
 - To be added later on
