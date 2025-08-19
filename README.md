@@ -48,3 +48,4 @@
 | Jenkins in Docker | [Jenkins in Docker Installation Guide](https://www.jenkins.io/doc/book/installing/docker/) |
 | Jenkins Pipeline | [Jenkins Pipelines Official Guide](https://www.jenkins.io/doc/book/pipeline/) |
 | Compare dirs in Python | [fimecmp package](https://docs.python.org/3/library/filecmp.html) |
+| Argparse in Python | [argparse](https://docs.python.org/2/library/argparse.html) |

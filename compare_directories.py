@@ -19,6 +19,7 @@ import os # Needed to navigate/check local directories
 import filecmp # Needed to compare directories - Will try homemade approach as well
 import subprocess # To run commands with external packages/git/aws
 import json # For capturing the comparison results
+import argparse # For getting arguments from the Jenkins pipeline
 
 # Function to check if the input is for a remote repo or a local dir
 def is_remote_repository(repo_url):
@@ -200,13 +201,43 @@ def main():
     # Group variables by source and target - This blocks development for comparing more than 2 dirs
     # Temporary section - input to be provided by Jenkins Parameters
     # https://github.com/rust-lang/rustlings
-    source_url = "https://github.com/inancgumus/learngo"
-    source_branch = ""
-    source_commit = ""
 
-    target_url = "https://github.com/inancgumus/learngo"
-    target_branch = ""
-    target_commit = ""
+
+
+
+    # I do not want to use sys.argv like $1, $2
+    # Using argparse: https://docs.python.org/2/library/argparse.html
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description='Compare directories')
+    
+    # Source section
+    # source_url = "https://github.com/inancgumus/learngo"
+    # source_branch = ""
+    # source_commit = ""
+    parser.add_argument('--source-repo-url', required=True, help='URL or path to source repository')
+    parser.add_argument('--source-repo-branch', default='', help='Branch to checkout in source repository')
+    parser.add_argument('--source-repo-commit', default='', help='Commit to checkout in source repository')
+
+    # Target section
+    # target_url = "https://github.com/inancgumus/learngo"
+    # target_branch = ""
+    # target_commit = ""
+    parser.add_argument('--target-repo-url', required=True, help='URL or path to target repository')
+    parser.add_argument('--target-repo-branch', default='', help='Branch to checkout in target repository')
+    parser.add_argument('--target-repo-commit', default='', help='Commit to checkout in target repository')
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Use arguments instead of hardcoded values
+    source_url = args.source_repo_url
+    source_branch = args.source_repo_branch
+    source_commit = args.source_repo_commit
+    
+    target_url = args.target_repo_url
+    target_branch = args.target_repo_branch
+    target_commit = args.target_repo_commit
+
 
     # Establish the repo/dir and return a path to be checked. If remote, the path is a custom folder, if local, the path is the input
     # Code for source
