@@ -12,6 +12,7 @@ pipeline {
         string(name: 'TARGET_REPO_URL', defaultValue: '', description: 'Target Git Repository URL')
         string(name: 'TARGET_REPO_BRANCH', defaultValue: '', description: 'Target Git Repository Branch')
         string(name: 'TARGET_REPO_COMMIT', defaultValue: '', description: 'Target Git Repository Commit')
+        string(name: 'S3_BUCKET', defaultValue: '', description: 'S3 Bucket Name')
     }
 
     // Section for stages
@@ -31,7 +32,8 @@ pipeline {
                     --source-repo-commit '${params.SOURCE_REPO_COMMIT}' \
                     --target-repo-url '${params.TARGET_REPO_URL}' \
                     --target-repo-branch '${params.TARGET_REPO_BRANCH}' \
-                    --target-repo-commit '${params.TARGET_REPO_COMMIT}'"""
+                    --target-repo-commit '${params.TARGET_REPO_COMMIT}' \
+                    --s3-bucket '${params.S3_BUCKET}'"""
             }
         }
     }

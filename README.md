@@ -43,7 +43,8 @@
 | T005   | For updating the Jenkins file to work with T004 Python script |
 | T006   | For adding requirements for the Python script |
 | T007   | For cleaning up code and comments |
-| T008   | Improve error handling and exit codes | 
+| T008   | Improve error handling and exit codes |
+| T009   | For handing artifact upload to S3 |
 
 # Sources
 | Resource | Links |
@@ -54,3 +55,4 @@
 | Jenkins Pipeline | [Jenkins Pipelines Official Guide](https://www.jenkins.io/doc/book/pipeline/) |
 | Compare dirs in Python | [fimecmp package](https://docs.python.org/3/library/filecmp.html) |
 | Argparse in Python | [argparse](https://docs.python.org/2/library/argparse.html) |
+| Uploading to S3 with Python | [AWS SDK for Python](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-uploading-files.html) |
