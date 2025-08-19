@@ -13,7 +13,17 @@
 - Search S3 bucket for previous matching comparison
 
 # How to use pipeline
-- To be added later on
+- Log into the Jenkins console
+- Go to the pipeline "Compare two directories"
+- Click on "Build with Parameters"
+- Fill in the parameters with the required information:
+    - SOURCE_REPO_URL - Enter the URL or path of the directory/repository you want to compare to.
+    - SOURCE_REPO_BRANCH - Enter the name of the branch you want to compare. Leave empty to use the default branch.
+    - SOURCE_REPO_COMMIT - Enter the commit ID, where to reset the repository to.
+    - TARGET_REPO_URL - Enter the URL or path of the directory/repository you want to compare with.
+    - TARGET_REPO_BRANCH - Enter the name of the branch you want to compare. Leave empty to use the default branch.
+    - TARGET_REPO_COMMIT - Enter the commit ID, where to reset the repository to.
+    - S3_BUCKET - Enter the name of the S3 bucket.
 
 # Infrastructure and Architecture
 - Hosted in AWS Cloud
