@@ -22,9 +22,16 @@ pipeline {
             }
         }
 
+        // Passing parameters as string in case they are empty - only URL args are required
         stage('Compare Directories') {
             steps {
-                sh "python3 compare_directories.py --source-repo-url ${params.SOURCE_REPO_URL} --source-repo-branch ${params.SOURCE_REPO_BRANCH} --source-repo-commit ${params.SOURCE_REPO_COMMIT} --target-repo-url ${params.TARGET_REPO_URL} --target-repo-branch ${params.TARGET_REPO_BRANCH} --target-repo-commit ${params.TARGET_REPO_COMMIT}"
+                sh """python3 compare_directories.py \
+                    --source-repo-url '${params.SOURCE_REPO_URL}' \
+                    --source-repo-branch '${params.SOURCE_REPO_BRANCH}' \
+                    --source-repo-commit '${params.SOURCE_REPO_COMMIT}' \
+                    --target-repo-url '${params.TARGET_REPO_URL}' \
+                    --target-repo-branch '${params.TARGET_REPO_BRANCH}' \
+                    --target-repo-commit '${params.TARGET_REPO_COMMIT}'"""
             }
         }
     }
