@@ -4,60 +4,69 @@ import filecmp # Needed to compare directories - Will try homemade approach as w
 import subprocess # To run commands with external packages/git/aws
 import json # For capturing the comparison results
 import argparse # For getting arguments from the Jenkins pipeline
+import sys # For exiting the script with an error code
+import logging # To replace print statements and provide proper logging
+import boto3 # For S3 upload
+from datetime import datetime # Used in naming the artifact
 
+# Setting up the logging messages
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Setting up raise options
+class ValidationError(Exception):
+    """Exception raised when input validation fails"""
+    pass
 
 # Function to check if the input is for a remote repo or a local dir
 def is_remote_repository(repo_url):
     # Check if the input is empty
     if not repo_url:
-        print("[Error] Provided value for repository is empty ")
-        return None
+        logging.info("[Error] Provided value for repository is empty ")
+        raise ValidationError("Provided value for repository is empty")
     
     # Check if the input is a local directory or a URL
     if repo_url.startswith("http://") or repo_url.startswith("https://"):
-        print(f"[Info] Detected remote repository URL: [{repo_url}]")
+        logging.info(f"[Info] Detected remote repository URL: [{repo_url}]")
+        # Return that the repository is remote - true
         return True
     else:
-        print(f"[Info] Detected local directory: [{repo_url}]")
+        logging.info(f"[Info] Detected local directory: [{repo_url}]")
+        # Return that the repository is not remote - false
         return False
 
 
-# Split into two functions based on if the repo is remote or local
 def initiate_remote_directory(repo_url, path):
     try:
         response = requests.get(repo_url)
         if response.status_code != 200:
-            print(f"[Error] Remote repository: [{repo_url}] is not accessible (HTTP {response.status_code})")
-            return None
+            raise ValidationError(f"[Error] Remote repository: [{repo_url}] is not accessible (HTTP {response.status_code})")
         else:
-            print(f"[Success] Remote repository: [{repo_url}] is accessible")
+            logging.info(f"[Success] Remote repository: [{repo_url}] is accessible")
     except requests.RequestException as e:
-        print(f"[Error] Invalid Repository URL: [{repo_url}]")
-        return None
+        raise ValidationError(f"[Error] Invalid Repository URL: [{repo_url}]")
 
-    print(f"[Info] Cloning the remote repo: [{repo_url}]")
+    logging.info(f"[Info] Cloning the remote repo: [{repo_url}]")
 
     # Remove the folder if it exists already - Could be a better way to ensure important files/paths do not get deleted (case: if path name matches another folder)
     if os.path.exists(path):
-        print(f"[Info] Removing existing directory: [{path}]")
+        logging.info(f"[Info] Removing existing directory: [{path}]")
         subprocess.run(["rm", "-rf", path], check=True)
     
+    # Clone the remote repository to a local directory
     try:
         subprocess.run(["git", "clone", repo_url, path], check=True)
-        print(f"[Success] Cloned {repo_url} into {path}")
+        logging.info(f"[Success] Cloned {repo_url} into {path}")
         return path
     except subprocess.CalledProcessError:
-        print(f"[Error] Failed to clone {repo_url}")
-        return None
+        raise ValidationError(f"[Error] Failed to clone {repo_url}")
     
 
 def initiate_local_directory(repo_url, path):
     # Check if the local directory exists
     if not os.path.isdir(repo_url):
-        print(f"[Error] Local directory: [{repo_url}] does not exist")
-        return None
+        raise ValidationError(f"[Error] Local directory: [{repo_url}] does not exist")
     else:
-        print(f"[Success] Local directory: [{repo_url}] is valid")
+        logging.info(f"[Success] Local directory: [{repo_url}] is valid")
         path = repo_url
         return path
 
@@ -126,9 +135,25 @@ def compare_directories(source_directory, target_directory, source_url, target_u
             }
         }
     }
+    # Print the JSON to the terminal - Useful for troubleshooting
+    logging.info(json.dumps(comparison_result, indent=2))
+
+    # The file is named comparison_YYMMDD_HHMM.json
+    # Then we can search each file for the directory name combo (branches, commits) - it would be a hassle to put everything in the filename 
+    timestamp = datetime.now().strftime('%y%m%d_%H%M')
+    filename = f"comparison_{timestamp}.json"
+
+    try:
+        with open(filename, 'w') as f:
+            json.dump(comparison_result, f, indent=2)
+        logging.info(f"[Success] Comparison result saved to: {filename}")
+    except Exception as e:
+        raise ValidationError(f"Failed to save comparison result: {str(e)}")
     
-    print(json.dumps(comparison_result, indent=2))
-    return comparison_result
+    # Return the full file path so we can use it to upload to S3
+    full_path = os.path.abspath(filename)
+    logging.info(f"[Success] Comparison file's full path: {full_path}")
+    return full_path
 
 
 def checkout_repo(path, branch, commit):
@@ -144,7 +169,7 @@ def checkout_repo(path, branch, commit):
     try:
         # If the branch input is empty, we should use the default branch
         if not branch:
-            print("[Info] No branch specified, checking default branch ...")
+            logging.info("[Info] No branch specified, checking default branch ...")
             # Get default branch if none specified
             default_branch = subprocess.check_output(
                 ["git", "symbolic-ref", "--short", "HEAD"], 
@@ -152,14 +177,14 @@ def checkout_repo(path, branch, commit):
                 text=True
             ).strip()
             branch = default_branch
-            print(f"[Info] Using default branch: {branch}")
+            logging.info(f"[Info] Using default branch: {branch}")
         else:
             # Run fetch to make sure the branch is okay
             subprocess.run(["git", "fetch"], check=True)
 
         # If the branch input is not empty, the if above will not run and the value will remain what the initial input was
         subprocess.run(["git", "checkout", branch], check=True)
-        print(f"[Success] Checked out branch: {branch}")
+        logging.info(f"[Success] Checked out branch: {branch}")
 
         # If a commit value was provided, check if it exists in the current branch. If it does, then reset to it
         if commit:
@@ -167,22 +192,48 @@ def checkout_repo(path, branch, commit):
                 subprocess.run(["git", "rev-parse", "--verify", commit], check=True)
                 # If the check passed, reset to the commit
                 subprocess.run(["git", "reset", "--hard", commit], check=True)
-                print(f"[Success] Reset to commit: {commit}")
+                logging.info(f"[Success] Reset to commit: {commit}")
             except subprocess.CalledProcessError:
-                print(f"[Error] Commit {commit} does not exist in branch {branch}")
-                # Reset back to the original directory
-                os.chdir(original_dir)
-                return False
+                raise ValidationError(f"[Error] Commit {commit} does not exist in branch {branch}")
 
         # If there is no commit value provided, we can assume the user wants the latest commit
         # Reset back to the original directory
         os.chdir(original_dir)
         return True
     except Exception as e:
-        print(f"[Error] Git operation failed: {str(e)}")
-        # Reset back to the original directory
-        os.chdir(original_dir)
-        return False
+        logging.info(f"[Error] Git operation failed: {str(e)}")
+        raise ValidationError(f"[Error] Git operation failed: {str(e)}")
+
+
+def upload_file(comparison_file_path, bucket_name, object_name=None):
+    try:
+        # Check if bucket name is provided
+        if not bucket_name:
+            raise ValidationError(f"S3 upload failed: No bucket specified")
+
+        # Create S3 client
+        s3_client = boto3.client('s3')
+        if object_name is None:
+            object_name = os.path.basename(comparison_file_path)
+        
+        # Check if the file exists before uploading
+        if not os.path.exists(comparison_file_path):
+            raise ValidationError(f"File not found: {comparison_file_path}")
+
+        # Upload the file
+        s3_client.upload_file(comparison_file_path, bucket_name, object_name)
+        
+        # Generate S3 URL
+        s3_url = f"https://{bucket_name}.s3.amazonaws.com/{object_name}"
+        logging.info(f"[Success] Uploaded to S3: {s3_url}")
+
+        return s3_url
+    except boto3.exceptions.Boto3Error as e:
+        logging.error(f"[Error] AWS/Boto3 error during S3 upload: {str(e)}")
+        raise ValidationError(f"S3 upload failed: {str(e)}")
+    except Exception as e:
+        logging.error(f"[Error] Failed to upload to S3: {str(e)}")
+        raise ValidationError(f"S3 upload failed: {str(e)}")
 
 
 def main():
@@ -198,7 +249,10 @@ def main():
     parser.add_argument('--target-repo-url', required=True, help='URL or path to target repository')
     parser.add_argument('--target-repo-branch', default='', help='Branch to checkout in target repository')
     parser.add_argument('--target-repo-commit', default='', help='Commit to checkout in target repository')
-    
+
+    # For the AWS S3 bucket
+    parser.add_argument('--s3-bucket', default='', help='S3 bucket endpoint')
+
     # Parse arguments
     args = parser.parse_args()
     
@@ -211,36 +265,32 @@ def main():
     target_branch = args.target_repo_branch
     target_commit = args.target_repo_commit
 
-    # Establish the repo/dir and return a path to be checked. If remote, the path is a custom folder, if local, the path is the input
+    s3_bucket = args.s3_bucket
+
+    # Establish the repo/dir and return a path to be checked. 
+    # If remote, the path is a custom folder. 
+    # If local, the path is the input.
     # Code for source
     if is_remote_repository(source_url):
         source_repo_path = initiate_remote_directory(source_url, "source_repo")
     else:
         source_repo_path = initiate_local_directory(source_url, "source_repo")
-    if source_repo_path is None:
-        print(f"[Error] Directory [{source_url}] could not be initialized.")
-        return
-    print(f"[Info] Source repo path: {source_repo_path}")
+    logging.info(f"[Info] Source repo path: {source_repo_path}")
+    checkout_repo(source_repo_path, source_branch, source_commit)
+
     # Code for target
     if is_remote_repository(target_url):
         target_repo_path = initiate_remote_directory(target_url, "target_repo")
     else:
         target_repo_path = initiate_local_directory(target_url, "target_repo")
-    if target_repo_path is None:
-        print(f"[Error] Directory [{target_url}] could not be initialized.")
-        return
-    print(f"[Info] Target repo path: {target_repo_path}")
-
-    # If the function returns false, print error and return to main - need to see how to print errors to users in Jenkins for UX
-    if not checkout_repo(source_repo_path, source_branch, source_commit):
-        print(f"[Error] Failed to checkout source repo. Please check the logs.")
-        return
-    if not checkout_repo(target_repo_path, target_branch, target_commit):
-        print(f"[Error] Failed to checkout target repo. Please check the logs.")
-        return
+    logging.info(f"[Info] Target repo path: {target_repo_path}")
+    checkout_repo(target_repo_path, target_branch, target_commit)
 
     # Compare the two directories/repos. Returns a JSON object
-    compare_directories(source_repo_path, target_repo_path, source_url, target_url)
+    comparison_file_path = compare_directories(source_repo_path, target_repo_path, source_url, target_url)
+    
+    s3_url = upload_file(comparison_file_path, s3_bucket)
+    logging.info(f"[Success] Comparison complete. File available at: {s3_url}")
 
 
 if __name__ == "__main__":
