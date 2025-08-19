@@ -76,24 +76,70 @@ def initiate_local_directory(repo_url, path):
         return path
 
 # Function to compare two directories
-def compare_directories(source_directory, target_directory):
-    # Compare the two directories
-    directory_comparison_object = filecmp.dircmp(source_directory, target_directory)
+def compare_directories(source_directory, target_directory, source_url, target_url):
+    # ISSUE - filecmp does compare the content - it did not show actual changes when testing
+    # Google, Reddit and Stackoverflow point to combining filecmp with os.walk 
 
-    # Populate JSON with the results from the filecmp
+    def get_all_files(directory):
+        file_paths = []
+        for root, dirs, files in os.walk(directory):
+            # Remove any .git paths as we do not want to check/compare those yet
+            if '.git' in dirs:
+                dirs.remove('.git')
+                
+            for file in files:
+                # Get path relative to the base directory
+                full_path = os.path.join(root, file)
+                rel_path = os.path.relpath(full_path, directory)
+                file_paths.append(rel_path)
+        return sorted(file_paths)
+        # Now we have an array of file paths that we can compare to eachother
+    
+    # Create an array of all files in each local repo
+    source_repo_files = get_all_files(source_directory)
+    target_repo_files = get_all_files(target_directory)
+    
+    # Set up empty arrays beforehand
+    common_identical_files = []
+    different_content_files = []
+    
+    source_only_files_array = [f for f in source_repo_files if f not in target_repo_files]
+    target_only_files_array = [f for f in target_repo_files if f not in source_repo_files]
+    
+    # For each file path in each local repo - add the original dir at the start so that the script can reach the file
+    for file in set(source_repo_files) & set(target_repo_files):
+        source_file = os.path.join(source_directory, file)
+        target_file = os.path.join(target_directory, file)
+        
+        # Now compare the files with filecmp - Add to each array based on if they are the same of not
+        if filecmp.cmp(source_file, target_file, shallow=False):
+            common_identical_files.append(file)
+        else:
+            different_content_files.append(file)
+    
+    # Append the result in a structured JSON format
     comparison_result = {
         "source_directory": source_directory,
         "target_directory": target_directory,
+        "source_directory_name": source_url,
+        "target_directory_name": target_url,
         "comparison": {
-            "common_files": directory_comparison_object.common_files,
-            "source_only": directory_comparison_object.left_only,
-            "target_only": directory_comparison_object.right_only,
-            "different_files": directory_comparison_object.diff_files,
-            "identical_files": len(directory_comparison_object.left_only) == 0 
-                        and len(directory_comparison_object.right_only) == 0 
-                        and len(directory_comparison_object.diff_files) == 0
+            "common_identical_files": common_identical_files,
+            "different_content_files": different_content_files,
+            "source_only_files": source_only_files_array,
+            "target_only_files": target_only_files_array,
+            "repos_identical": len(source_only_files_array) == 0 and len(target_only_files_array) == 0 and len(different_content_files) == 0,
+            "statistics": {
+                "total_files_source": len(source_repo_files),
+                "total_files_target": len(target_repo_files),
+                "identical_files": len(common_identical_files),
+                "different_files": len(different_content_files),
+                "source_only": len(source_only_files_array),
+                "target_only": len(target_only_files_array)
+            }
         }
     }
+    
     print(json.dumps(comparison_result, indent=2))
     return comparison_result
 
@@ -140,9 +186,10 @@ def checkout_repo(path, branch, commit):
                 os.chdir(original_dir)
                 return False
 
-            # Reset back to the original directory
-            os.chdir(original_dir)
-            return True
+        # If there is no commit value provided, we can assume the user wants the latest commit
+        # Reset back to the original directory
+        os.chdir(original_dir)
+        return True
     except Exception as e:
         print(f"[Error] Git operation failed: {str(e)}")
         # Reset back to the original directory
@@ -153,35 +200,33 @@ def main():
     # Group variables by source and target - This blocks development for comparing more than 2 dirs
     # Temporary section, input might be a list
     # https://github.com/rust-lang/rustlings
-    source_directory = "https://github.com/inancgumus/learngo"
-    target_directory = "https://github.com/inancgumus/learngo"
-    
-    # Now to check commits, but branch?
-    # Can be like if branch is not provided, then use main/master/default
-    # Check for commit in that branch
-    # "Main" Branches can be either main/master - differs from repo to repo
+    source_url = "https://github.com/inancgumus/learngo"
     source_branch = ""
-    source_commit = "33333333"
+    source_commit = ""
+
+    target_url = "https://github.com/inancgumus/learngo"
     target_branch = ""
-    target_commit = "1111111111111111"
+    target_commit = "c8d7a50e9e7f2b5e7b72ddb5c6091fcbf7953f93"
+    
+
 
     # Establish the repo/dir and return a path to be checked. If remote, the path is a custom folder, if local, the path is the input
     # Code for source
-    if is_remote_repository(source_directory):
-        source_repo_path = initiate_remote_directory(source_directory, "source_repo")
+    if is_remote_repository(source_url):
+        source_repo_path = initiate_remote_directory(source_url, "source_repo")
     else:
-        source_repo_path = initiate_local_directory(source_directory, "source_repo")
+        source_repo_path = initiate_local_directory(source_url, "source_repo")
     if source_repo_path is None:
-        print(f"[Error] Directory [{source_directory}] could not be initialized.")
+        print(f"[Error] Directory [{source_url}] could not be initialized.")
         return
     print(f"[Info] Source repo path: {source_repo_path}")
     # Code for target
-    if is_remote_repository(target_directory):
-        target_repo_path = initiate_remote_directory(target_directory, "target_repo")
+    if is_remote_repository(target_url):
+        target_repo_path = initiate_remote_directory(target_url, "target_repo")
     else:
-        target_repo_path = initiate_local_directory(target_directory, "target_repo")
+        target_repo_path = initiate_local_directory(target_url, "target_repo")
     if target_repo_path is None:
-        print(f"[Error] Directory [{target_directory}] could not be initialized.")
+        print(f"[Error] Directory [{target_url}] could not be initialized.")
         return
     print(f"[Info] Target repo path: {target_repo_path}")
 
@@ -194,7 +239,7 @@ def main():
         return
 
     # Compare the two directories/repos. Returns a JSON object
-    compare_directories(source_repo_path, target_repo_path)
+    compare_directories(source_repo_path, target_repo_path, source_url, target_url)
 
 
 if __name__ == "__main__":
